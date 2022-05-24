@@ -4,43 +4,73 @@ import ColetorUSB as cusb
 import time
 
 
+class Module:
+    def __init__(self, appName="", fisicalIndex=-1):
+        self.AppName = appName
+        self.FisicalIndex = fisicalIndex
+
+    def getAppName(self):
+        return self.AppName
+
+    def getFisicalIndex(self):
+        return self.FisicalIndex
+
+    def setAppName(self, name):
+        self.appName = name
+
+    def setFisicalIndex(self, index):
+        self.FisicalIndex = index
+
+
+class ModulesCollection:
+    def __init__(self):
+        self.Modules = []
+
+    def AddModulo(self, appName, fisicalIndex):
+        self.Modules.append(Module(appName, fisicalIndex))
+
+    def CreateCollection(self, DicValues):
+        self.Modules = []
+        for elem, index in zip(DicValues, range(len(DicValues))):
+            self.AddModulo(DicValues[elem], index)
+
+    def GetCollection(self):
+        return self.Modules
+
+    def GetNomeFonte(self, moduleIndex):
+        for module in self.Modules:
+            if moduleIndex == module.getFisicalIndex():
+                return module.getAppName()
+        return []
+
+
 class ModMixerGUI:
     def __init__(self):
         self.usbColetor = cusb.ColetorUSB()
         self.mixer = mm.Mixer("User")
-        self.Mixers_NameAndIndex = []  # Trocar por classe
-        self.NumeroMixers = 0
+        self.modules = ModulesCollection()
+        self.numerModulos = 0
         self.refreshTimeoutTime = 5
-        self.NumeroMaximoMixers = 3
+        self.NumeroMaximoModulos = 3
         self.setAppNames()
 
-    # Usa a mensagem recebida para determinar o numero de mixers
-    # Este metodo pode ser vinculado com alguma mensagem recebida do master
-    def AtualizaNumeroMixers(self, nMixers):
-        self.NumeroMixers = nMixers
+    def AtualizaNumeroModulos(self, nModules):
+        self.numerModulos = nModules
 
-    def GetNumeroMixers(self):  # colocar na nova classe
-        return self.NumeroMixers
-
-    def GetNomeFonte(self, mixerIndex):  # colocar na nova classe
-        for mixerNameAndIndex in self.Mixers_NameAndIndex:
-            if mixerIndex == mixerNameAndIndex[1]:
-                return mixerNameAndIndex[0]
-        return []
+    def getNumeroModulos(self):
+        return self.numerModulos
 
     def getApplicationsName(self):
         nomes = self.mixer.GetNomeFontes()
         return nomes
 
     def AtualizaEscolhasIndex(self, DicValues):
-        self.Mixers_NameAndIndex = []
-        for elem, index in zip(DicValues, range(len(DicValues))):
-            self.Mixers_NameAndIndex.append([DicValues[elem], index])
+        self.modules.CreateCollection(DicValues)
 
     def setVisibles(self):
         if self.EhMixerAtivado():
-            for index in range(self.NumeroMaximoMixers):
-                if index < self.GetNumeroMixers():
+            for index in range(self.NumeroMaximoModulos):
+                if index < self.getNumeroModulos():
                     isVisible = True
                 else:
                     isVisible = False
@@ -60,7 +90,7 @@ class ModMixerGUI:
         layout.append([title_line])
 
         # Gera menu para cada possivel mixer
-        for index in range(self.NumeroMaximoMixers):
+        for index in range(self.NumeroMaximoModulos):
             mixer_line = psg.Text(
                 "mixer [" + str(index) + "]",
                 key="mixer_line" + str(index),
@@ -119,7 +149,7 @@ class ModMixerGUI:
         self.win = psg.Window("ModMixer", layout, finalize=True)
 
     def EhFechamento(self, event):
-        if event == psg.WIN_CLOSED or event == "Exit":
+        if event == psg.WIN_CLOSED or event == "None":
             return True
         else:
             return False
@@ -129,28 +159,26 @@ class ModMixerGUI:
 
     # Verifica se existem mixers conectados
     def EhMixerAtivado(self):
-        if self.GetNumeroMixers() > 0:
+        if self.getNumeroModulos() > 0:
             return True
         else:
             return False
 
     def AtualizaBarrasTela(self):
         # Para cada fonte selecianada no menu:
-        for fonte in self.Mixers_NameAndIndex:
-            # MUDAR PARA CLASSE E USAR GET
-            fonteName = fonte[0]
-            fonteIndex = fonte[1]
+        for module in self.modules.GetCollection():
 
             # Coleta o volume dessa fonte
-            volFonte = self.mixer.GetVolume(fonteName)
+            volFonte = self.mixer.GetVolume(module.getAppName())
+
             # Atualiza a barra com esse valor de volume
-            progress_bar = self.win["volumeBar" + str(fonteIndex)]
+            progress_bar = self.win["volumeBar" + str(module.getFisicalIndex())]
             progress_bar.UpdateBar(volFonte)
 
     def AtualizaListaApps(self):
 
         nomes_app = self.getApplicationsName()
-        for index in range(self.NumeroMaximoMixers):
+        for index in range(self.NumeroMaximoModulos):
             # Atualiza nomes dos aplicativos: (atenção no 'apenas' mudar a ordem e ja alterar tudo)
             self.win["apps_List" + str(index)].update(value="", values=nomes_app)
 
@@ -158,7 +186,7 @@ class ModMixerGUI:
         self.win.close()
 
     # Uma janela ja deve ter sido criada
-    def AguardaMixers(self, Sinais):
+    def AguardaModules(self, Sinais):
 
         # Caso a janela tenha sido criada para o sistema sem som
         if not self.EhMixerAtivado():
@@ -185,25 +213,17 @@ class ModMixerGUI:
             event, values = self.win.read(timeout=self.refreshTimeoutTime)
         else:
             event, values = self.win.read()
-
-        if self.EhFechamento(event):
-            quit()
         return [event, values]
 
-    def exibeFontes(self):
-        print("Fontes: ")
-        for fonte in self.Mixers_NameAndIndex:
-            print(fonte[1], fonte[0])
-
-    def InterpretaSinal_MixerIndex(self, mixerIndex_signal):
+    def InterpretaSinal_ModuleIndex(self, moduleIndex_signal):
         try:
-            mixerIndex = int(mixerIndex_signal)
+            moduleIndex = int(moduleIndex_signal)
         except:
-            mixerIndex = -1
+            moduleIndex = -1
 
         # Traduz o index do mixer fisico para um nome de fonte
-        nomeFonte = self.GetNomeFonte(mixerIndex)
-        print("NOME FONTE:", nomeFonte, ", MIXER INDEX: ", mixerIndex)
+        nomeFonte = self.modules.GetNomeFonte(moduleIndex)
+        print("NOME FONTE:", nomeFonte, ", MIXER INDEX: ", moduleIndex)
         # Mixer responde quais fontes pertencem este nome
         fontes = self.mixer.GetFontePorNome(nomeFonte)
 
@@ -231,27 +251,40 @@ class ModMixerGUI:
     def InterpretaSinais(self, Sinais):
 
         SinaisInterpretados = []
-        for [cabecalho_signal, mixerIndex_signal, percentual_signal] in Sinais:
+        for [cabecalho_signal, moduleIndex_signal, percentual_signal] in Sinais:
 
             comando = self.InterpretaSinal_Cabecalho(cabecalho_signal)
             percentual = self.InterpretaSinal_Percentual(percentual_signal)
-            fontes = self.InterpretaSinal_MixerIndex(mixerIndex_signal)
+            fontes = self.InterpretaSinal_ModuleIndex(moduleIndex_signal)
 
             SinaisInterpretados.append([comando, fontes, percentual])
 
         return SinaisInterpretados
 
+    def OperaEntradasJanela(self, event, values):
+        print("evento::", event)
+        if self.EhFechamento(event):
+            self.win.close()
+            quit()
+        elif event == "Apply changes":
+            print("Apply changes")
+            # Altera valores de index e nome de app conforme definido no menu
+            self.AtualizaEscolhasIndex(values)
+        elif event == "Refresh APP's list":
+            print("Refresh APP's list")
+            self.AtualizaListaApps()
+
     def loop(self):
 
         # Inicia escuta por mixers fisicos para criar layout
-        Sinais, nMixers = self.usbColetor.CapturaComando()
+        Sinais, nModules = self.usbColetor.CapturaComando()
 
-        self.AtualizaNumeroMixers(nMixers)
+        self.AtualizaNumeroModulos(nModules)
 
         # Cria janela com layout inicial
         self.CriaJanela()
         # Aguarda o sistema identificar mixers fisicos, e exibe tela de espera
-        Sinais = self.AguardaMixers(Sinais)
+        Sinais = self.AguardaModules(Sinais)
 
         # Retira da janela os menus de mixers desconectados
         self.setVisibles()
@@ -264,14 +297,7 @@ class ModMixerGUI:
             # Espera leitura eventos e valores de entrada
             [event, values] = self.LeituraDeJanela(timoutOn=True)
 
-            if event == "Apply changes":
-                print("Apply changes")
-                # Altera valores de index e nome de app conforme definido no menu
-                self.AtualizaEscolhasIndex(values)
-
-            elif event == "Refresh APP's list":
-                print("Refresh APP's list")
-                self.AtualizaListaApps()
+            self.OperaEntradasJanela(event, values)
 
             self.AtualizaBarrasTela()
 
@@ -279,15 +305,14 @@ class ModMixerGUI:
             self.mixer.OperaComandos(SinaisInterpretados)
 
             # Recebe comandos dos mixers fisicos pelo usb (MIXER.INDEX)
-
-            Sinais, nMixers = self.usbColetor.CapturaComando()
-            self.AtualizaNumeroMixers(nMixers)
+            Sinais, nModules = self.usbColetor.CapturaComando()
+            self.AtualizaNumeroModulos(nModules)
 
             # Retira da janela os menus de mixers desconectados
             self.setVisibles()
 
-            # Aguarda o sistema identificar Mixers conectados, e exibe tela de espera
-            Sinais = self.AguardaMixers(Sinais)
+            # Aguarda o sistema identificar Modules conectados, e exibe tela de espera
+            Sinais = self.AguardaModules(Sinais)
 
 
 # """
@@ -299,26 +324,9 @@ class ModMixerGUI:
 # AS BARRA DE VOLUME ATUALIZAM COM ALTA FREQUENCIA
 # OS MIXERS APARECEM CONFORME "SOLITICADOS" PELO VOLUMEMIXER (nao pelo numero de abas)
 
-
-# BUGS:
-
-# SE ELE INICIA SEM BOTAO, COMO ELE SAI DA TELA DE AGUARDO
-
-# BARRA DE VOLUME NAO ESTA ACOMPANHANDO
-
-# Se ele inicia em tela de 1 mixer, ele vai para 2?
-
-# TIRAR EFEITO DE APAGAR TUDO QUANDO DA REFRESH, GUARDAR ORDEM E COLOCAR NOS DEFAULT
-# A OPCAO ESCOLHIDA DEVE PERMANECER
-
-
-# Os comandos sao dados na ordem de indexacao da GUI
-# Apartir desse index -> nome do app -PROCURA-> index do sistema
-
-
-# USAR O NOME DO APP INVES DO INDICE DA FONTE! O indice muda, nao adianta salvar
-
-
-# USB (Captura sinal (MixerIndex))
+# USB (Captura sinal (ModuleIndex))
 # GUI(MIXER.INDEX -> nomeAPP)
-# VolumeMixer (nomeAPP --ProcuraPeloNome-> fonte -> Atuacao na fonte)
+# VolumeModule (nomeAPP --ProcuraPeloNome-> fonte -> Atuacao na fonte)
+
+
+# BUG, SE EFETUA MUDANCA NAS BARRAS E FECHA SEM SALVAR ELE CRASHA
