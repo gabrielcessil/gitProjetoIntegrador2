@@ -1,25 +1,36 @@
 import PySimpleGUI as psg
 import VolumeMixer as mm
+import ColetorUSB as cusb
 import time
 
 
 class ModMixerGUI:
     def __init__(self):
+        self.usbColetor = cusb.ColetorUSB()
         self.mixer = mm.Mixer("User")
         self.Mixers_NameAndIndex = []  # Trocar por classe
+        self.NumeroMixers = 0
         self.refreshTimeoutTime = 5
         self.NumeroMaximoMixers = 3
         self.setAppNames()
 
-    def getApplicationsName(self):
-        nomes = self.mixer.GetNomeFontes()
-        return nomes
+    # Usa a mensagem recebida para determinar o numero de mixers
+    # Este metodo pode ser vinculado com alguma mensagem recebida do master
+    def AtualizaNumeroMixers(self, nMixers):
+        self.NumeroMixers = nMixers
+
+    def GetNumeroMixers(self):  # colocar na nova classe
+        return self.NumeroMixers
 
     def GetNomeFonte(self, mixerIndex):  # colocar na nova classe
         for mixerNameAndIndex in self.Mixers_NameAndIndex:
             if mixerIndex == mixerNameAndIndex[1]:
                 return mixerNameAndIndex[0]
         return []
+
+    def getApplicationsName(self):
+        nomes = self.mixer.GetNomeFontes()
+        return nomes
 
     def AtualizaEscolhasIndex(self, DicValues):
         self.Mixers_NameAndIndex = []
@@ -29,7 +40,7 @@ class ModMixerGUI:
     def setVisibles(self):
         if self.EhMixerAtivado():
             for index in range(self.NumeroMaximoMixers):
-                if index < self.mixer.GetNumeroMixers():
+                if index < self.GetNumeroMixers():
                     isVisible = True
                 else:
                     isVisible = False
@@ -40,6 +51,8 @@ class ModMixerGUI:
 
     def CriaLayoutMixerAtivado(self):
         nomes_app = self.getApplicationsName()
+        nomes_app.append("none")
+
         layout = []
         title_line = psg.Text(
             "Select applications", font="Arial 15", justification="center"
@@ -116,7 +129,7 @@ class ModMixerGUI:
 
     # Verifica se existem mixers conectados
     def EhMixerAtivado(self):
-        if self.mixer.GetNumeroMixers() > 0:
+        if self.GetNumeroMixers() > 0:
             return True
         else:
             return False
@@ -158,7 +171,7 @@ class ModMixerGUI:
             while not self.EhMixerAtivado():
                 print("Aguardando")
                 # Captura entradas ate que identifique a existencia de um mixer fisico
-                Sinais = self.mixer.CapturaComando()
+                Sinais = self.usbColetor.CapturaComando()
                 time.sleep(0.001)
 
             # Fecha a janela para o sistema sem som, para que possa ser substituida
@@ -190,7 +203,7 @@ class ModMixerGUI:
 
         # Traduz o index do mixer fisico para um nome de fonte
         nomeFonte = self.GetNomeFonte(mixerIndex)
-        print("NOME FONTE:", nomeFonte, ", MIXER INDEX: ",mixerIndex)
+        print("NOME FONTE:", nomeFonte, ", MIXER INDEX: ", mixerIndex)
         # Mixer responde quais fontes pertencem este nome
         fontes = self.mixer.GetFontePorNome(nomeFonte)
 
@@ -231,7 +244,10 @@ class ModMixerGUI:
     def loop(self):
 
         # Inicia escuta por mixers fisicos para criar layout
-        Sinais = self.mixer.CapturaComando()
+        Sinais, nMixers = self.usbColetor.CapturaComando()
+
+        self.AtualizaNumeroMixers(nMixers)
+
         # Cria janela com layout inicial
         self.CriaJanela()
         # Aguarda o sistema identificar mixers fisicos, e exibe tela de espera
@@ -263,7 +279,9 @@ class ModMixerGUI:
             self.mixer.OperaComandos(SinaisInterpretados)
 
             # Recebe comandos dos mixers fisicos pelo usb (MIXER.INDEX)
-            Sinais = self.mixer.CapturaComando()
+
+            Sinais, nMixers = self.usbColetor.CapturaComando()
+            self.AtualizaNumeroMixers(nMixers)
 
             # Retira da janela os menus de mixers desconectados
             self.setVisibles()
