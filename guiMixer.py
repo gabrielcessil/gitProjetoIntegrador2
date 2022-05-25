@@ -3,7 +3,6 @@ import VolumeMixer as mm
 import ColetorUSB as cusb
 import time
 
-
 # Informacoes do modulo visto pela interface grafica
 class Module:
     def __init__(self, appName="", fisicalIndex=-1):
