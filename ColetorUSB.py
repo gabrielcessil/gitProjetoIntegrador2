@@ -1,8 +1,6 @@
-# import serial.tools.list_ports
-# ports = serial.tools.list_ports.comports()
-# for port, desc, hwid in sorted(ports):
-#        print("{}: {} [{}]".format(port, desc, hwid))
 
+# Classe responsavel pela coleta de dados da porta USB,
+#  formatacao da mensagem, e definicao do numero de modulos conectados
 
 class ColetorUSB:
     def __init__(self, BoundRate=0, Timeout=0, Port=-1):
