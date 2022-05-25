@@ -4,6 +4,7 @@ import ColetorUSB as cusb
 import time
 
 
+# Informacoes do modulo visto pela interface grafica
 class Module:
     def __init__(self, appName="", fisicalIndex=-1):
         self.AppName = appName
@@ -21,7 +22,7 @@ class Module:
     def setFisicalIndex(self, index):
         self.FisicalIndex = index
 
-
+# Gerenciamento do grupo de modulos
 class ModulesCollection:
     def __init__(self):
         self.Modules = []
@@ -46,15 +47,33 @@ class ModulesCollection:
 
 class ModMixerGUI:
     def __init__(self):
+        self.janelaAberta = False
         self.usbColetor = cusb.ColetorUSB()
         self.mixer = mm.Mixer("User")
         self.modules = ModulesCollection()
-        self.numerModulos = 0
+        self.numerModulos = -1
         self.refreshTimeoutTime = 5
         self.NumeroMaximoModulos = 3
-        self.setAppNames()
+        self.Layouts = {"Iniciando": self.CreateLayoutMixerIniciando(),
+                        "Ativado": self.CreateLayoutMixerAtivado(),
+                        "Desativado": self.CreateLayoutMixerDesativado()}
+
+        self.dicEstadosJanela = { "None": 0,"Iniciando":1, "Ativado":2, "Desativado":3}
+        self.estadoJanela = self.dicEstadosJanela["None"]
+        
+    def setEstadoLayout(self, estado):
+        self.estadoJanela = estado
+
+    def IdentificaEstadoJanela(self):
+        if(self.numerModulos < 0):
+            return(self.dicEstadosJanela["Iniciando"])
+        elif(self.numerModulos == 0):
+            return(self.dicEstadosJanela["Desativado"])
+        else:
+            return(self.dicEstadosJanela["Ativado"])
 
     def AtualizaNumeroModulos(self, nModules):
+        print("Numero de modulos:",nModules)
         self.numerModulos = nModules
 
     def getNumeroModulos(self):
@@ -68,18 +87,17 @@ class ModMixerGUI:
         self.modules.CreateCollection(DicValues)
 
     def setVisibles(self):
-        if self.EhMixerAtivado():
-            for index in range(self.NumeroMaximoModulos):
-                if index < self.getNumeroModulos():
-                    isVisible = True
-                else:
-                    isVisible = False
+        for index in range(self.NumeroMaximoModulos):
+            if index < self.getNumeroModulos():
+                isVisible = True
+            else:
+                isVisible = False
 
-                self.win["volumeBar" + str(index)].Update(visible=isVisible)
-                self.win["apps_List" + str(index)].Update(visible=isVisible)
-                self.win["mixer_line" + str(index)].Update(visible=isVisible)
+            self.win["volumeBar" + str(index)].Update(visible=isVisible)
+            self.win["apps_List" + str(index)].Update(visible=isVisible)
+            self.win["mixer_line" + str(index)].Update(visible=isVisible)
 
-    def CriaLayoutMixerAtivado(self):
+    def CreateLayoutMixerAtivado(self):
         nomes_app = self.getApplicationsName()
         nomes_app.append("none")
 
@@ -123,7 +141,7 @@ class ModMixerGUI:
 
         return layout
 
-    def CriaLayoutMixerDesativado(self):
+    def CreateLayoutMixerDesativado(self):
         layout = []
         mixer_line = psg.Text(
             "Please, connect the ModMixers modules",
@@ -131,22 +149,38 @@ class ModMixerGUI:
             justification="center",
         )
         layout.append([mixer_line])
-
         return layout
 
-    def CriaLayout(self):
-        if self.EhMixerAtivado():
-            layout = self.CriaLayoutMixerAtivado()
+    def CreateLayoutMixerIniciando(self):
+        layout = []
+        mixer_line = psg.Text(
+            "Connecting...",
+            font="Arial 45",
+            justification="center",
+        )
+        layout.append([mixer_line])
+        return layout
+
+    def getLayout(self, estadoJanela):
+        layout =[]
+        if(estadoJanela == self.dicEstadosJanela["Iniciando"]):
+            layout = self.Layouts["Iniciando"]
+        elif(estadoJanela == self.dicEstadosJanela["Ativado"]):
+            layout = self.Layouts["Ativado"]
         else:
-            layout = self.CriaLayoutMixerDesativado()
+            layout = self.Layouts["Desativado"]
         return layout
 
-    def CriaJanela(self):
+    def CriaJanela(self, novoEstadoJanela):
+        # Se o layout deve ser mudado
+        if(novoEstadoJanela != self.estadoJanela):
+            if(self.janelaAberta):
+                self.FechaJanela()
 
-        # Cria layouts
-        layout = self.CriaLayout()
-        # Cria novo objeto de janela
-        self.win = psg.Window("ModMixer", layout, finalize=True)
+            self.janelaAberta = True
+            self.setEstadoLayout(novoEstadoJanela)
+            layout = self.getLayout(novoEstadoJanela)
+            self.win = psg.Window("ModMixer", layout, finalize=True)
 
     def EhFechamento(self, event):
         if event == psg.WIN_CLOSED or event == "None":
@@ -154,59 +188,24 @@ class ModMixerGUI:
         else:
             return False
 
-    def setAppNames(self):
-        self.AppNames = self.getApplicationsName()
-
-    # Verifica se existem mixers conectados
-    def EhMixerAtivado(self):
-        if self.getNumeroModulos() > 0:
-            return True
-        else:
-            return False
-
     def AtualizaBarrasTela(self):
         # Para cada fonte selecianada no menu:
         for module in self.modules.GetCollection():
-
             # Coleta o volume dessa fonte
             volFonte = self.mixer.GetVolume(module.getAppName())
-
             # Atualiza a barra com esse valor de volume
             progress_bar = self.win["volumeBar" + str(module.getFisicalIndex())]
             progress_bar.UpdateBar(volFonte)
 
     def AtualizaListaApps(self):
-
         nomes_app = self.getApplicationsName()
         for index in range(self.NumeroMaximoModulos):
             # Atualiza nomes dos aplicativos: (atenção no 'apenas' mudar a ordem e ja alterar tudo)
             self.win["apps_List" + str(index)].update(value="", values=nomes_app)
 
     def FechaJanela(self):
+        self.janelaAberta = False
         self.win.close()
-
-    # Uma janela ja deve ter sido criada
-    def AguardaModules(self, Sinais):
-
-        # Caso a janela tenha sido criada para o sistema sem som
-        if not self.EhMixerAtivado():
-
-            # Refaz a janela
-            self.FechaJanela()
-            self.CriaJanela()
-
-            # Aguarda Fontes de som
-            while not self.EhMixerAtivado():
-                print("Aguardando")
-                # Captura entradas ate que identifique a existencia de um mixer fisico
-                Sinais = self.usbColetor.CapturaComando()
-                time.sleep(0.001)
-
-            # Fecha a janela para o sistema sem som, para que possa ser substituida
-            self.FechaJanela()
-            self.CriaJanela()
-
-        return Sinais
 
     def LeituraDeJanela(self, timoutOn=False):
         if timoutOn:
@@ -224,6 +223,7 @@ class ModMixerGUI:
         # Traduz o index do mixer fisico para um nome de fonte
         nomeFonte = self.modules.GetNomeFonte(moduleIndex)
         print("NOME FONTE:", nomeFonte, ", MIXER INDEX: ", moduleIndex)
+        
         # Mixer responde quais fontes pertencem este nome
         fontes = self.mixer.GetFontePorNome(nomeFonte)
 
@@ -268,54 +268,65 @@ class ModMixerGUI:
             quit()
         elif event == "Apply changes":
             print("Apply changes")
-            # Altera valores de index e nome de app conforme definido no menu
             self.AtualizaEscolhasIndex(values)
         elif event == "Refresh APP's list":
             print("Refresh APP's list")
             self.AtualizaListaApps()
 
-    def loop(self):
+    def OperaGUI(self, event, values):
+        self.OperaEntradasJanela(event, values)
+        self.AtualizaBarrasTela()
+        self.setVisibles()    
+    
+    def OperaAplicacoes(self, SinaisInterpretados):
+        # Realiza as operacoes indicadas pelos comandos traduzidos
+        self.mixer.OperaComandos(SinaisInterpretados)
 
-        # Inicia escuta por mixers fisicos para criar layout
+    def AtualizaJanela(self):
+        estadoJanela = self.IdentificaEstadoJanela()
+        self.CriaJanela(estadoJanela)
+        return(estadoJanela)
+
+
+
+    def RecebeSinaisModulos(self):
+        # Escuta por mixers fisicos para criar layout
         Sinais, nModules = self.usbColetor.CapturaComando()
-
+        # Traduz sinais de index para comandos conhecidos pela GUI
+        comandos = self.InterpretaSinais(Sinais)
+        # Atualiza conhecimento de numero de modulos conectados
         self.AtualizaNumeroModulos(nModules)
 
-        # Cria janela com layout inicial
-        self.CriaJanela()
-        # Aguarda o sistema identificar mixers fisicos, e exibe tela de espera
-        Sinais = self.AguardaModules(Sinais)
-
-        # Retira da janela os menus de mixers desconectados
-        self.setVisibles()
-
-        while True:
-            print("\n")
-            # Traduz esses sinais para comandos conhecidos (MIXER.INDEX -> nomeAPP)
-            SinaisInterpretados = self.InterpretaSinais(Sinais)
-
-            # Espera leitura eventos e valores de entrada
-            [event, values] = self.LeituraDeJanela(timoutOn=True)
-
-            self.OperaEntradasJanela(event, values)
-
-            self.AtualizaBarrasTela()
-
-            # Realiza as operacoes indicadas pelos comandos traduzidos
-            self.mixer.OperaComandos(SinaisInterpretados)
-
-            # Recebe comandos dos mixers fisicos pelo usb (MIXER.INDEX)
-            Sinais, nModules = self.usbColetor.CapturaComando()
-            self.AtualizaNumeroModulos(nModules)
-
-            # Retira da janela os menus de mixers desconectados
-            self.setVisibles()
-
-            # Aguarda o sistema identificar Modules conectados, e exibe tela de espera
-            Sinais = self.AguardaModules(Sinais)
+        return(comandos)
 
 
-# """
+    def loop(self):
+        
+        Sinais = []
+        while(True):
+            print()
+            estadoJanela = self.AtualizaJanela()
+            
+            if(estadoJanela == self.dicEstadosJanela["Iniciando"]):
+                print("Janela inicial")
+                time.sleep(0.5) 
+            
+            elif(estadoJanela == self.dicEstadosJanela["Ativado"]):
+                print("Janela de menus")
+                [event, values] = self.LeituraDeJanela(timoutOn=True)
+                self.OperaGUI(event, values)
+                self.OperaAplicacoes(Sinais)
+
+            else:
+                print("Janela de aguardo por modulos")
+                time.sleep(0.2)
+                
+            Sinais = self.RecebeSinaisModulos()
+
+
+
+
+
 
 # DESEJADO:
 
@@ -324,9 +335,11 @@ class ModMixerGUI:
 # AS BARRA DE VOLUME ATUALIZAM COM ALTA FREQUENCIA
 # OS MIXERS APARECEM CONFORME "SOLITICADOS" PELO VOLUMEMIXER (nao pelo numero de abas)
 
-# USB (Captura sinal (ModuleIndex))
-# GUI(MIXER.INDEX -> nomeAPP)
-# VolumeModule (nomeAPP --ProcuraPeloNome-> fonte -> Atuacao na fonte)
 
-
-# BUG, SE EFETUA MUDANCA NAS BARRAS E FECHA SEM SALVAR ELE CRASHA
+# Melhorar organizacao das abstracoes
+# Erro ao sair
+# So permitir ele selecionar o app uma vez no menu
+# Melhorias no design da interface
+# Usar Pyinstaller para gerar instalador de dependencias
+# Fazer icon da aplicação
+# Comunicar com usb
