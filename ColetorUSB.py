@@ -8,14 +8,34 @@ class ColetorUSB:
         self.timeout = Timeout
         self.port = Port
 
-    # Mensagens recebidas (Deve casar com o formato esperado), e numero de mixers
+        #PARA TESTE
+        self.i = 0
+        self.percent = 0.1
+
+    # Mensagens recebidas (Retorno deve casar com o formato esperado), e numero de mixers
     def CapturaComando(self):
-        print(
-            "Simulacao port ",
-            self.port,
-            ": AUMENTAR MIXER [0], DIMINUIR MIXER [1]",
-        )
-        entradasFormatadas = [["F", "0", "0.9"], ["F", "1", "0.1"]]
+        imax =5000
+        percentMIN = 0.1
+
+        entradasFormatadas = []
+        self.i = (self.i+10) % imax
+        self.percent = percentMIN + (self.i/imax)
+        if(self.i < imax/5):
+            print(
+                "Simulacao port ",
+                self.port,
+                ": SILENCIO",
+            )
+        else:  
+
+            print(
+                "Simulacao port ",
+                self.port,
+                ": AUMENTAR MIXER [0], DIMINUIR MIXER [1]",
+            )
+            entradasFormatadas = [["F", "0", str(self.percent)], ["F", "1", "0.1"]]
+
+
         nMixers = len(entradasFormatadas)
         return [entradasFormatadas, nMixers]
 
