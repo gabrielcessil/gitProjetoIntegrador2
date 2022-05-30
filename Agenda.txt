@@ -1,1 +1,17 @@
-#este eh um teste22
+# DESEJADO:
+
+# ELE PRECISA ATUALIZAR A ESCOLHA DE INDEX SOMENTE APOS O CLIQUE
+# AS OPCOES DE APP ATUALIZAM COM REFRESH OU A CADA 100ms
+# AS BARRA DE VOLUME ATUALIZAM COM ALTA FREQUENCIA
+# OS MIXERS APARECEM CONFORME "SOLITICADOS" PELO VOLUMEMIXER (nao pelo numero de abas)
+
+# Gerar uml apartir do codigo
+# Comunicar com usb
+# Usar Pyinstaller para gerar instalador de dependencias
+# Fazer icon da aplicação
+# Medicoes de tempo de resposta
+
+# Melhorias no design da interface
+# Mudar nomes de atributos privados
+# Parametros de qualidade clean code
+# Voltar todos ao maximo por botao ou na saida?

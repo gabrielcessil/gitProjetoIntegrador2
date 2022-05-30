@@ -27,6 +27,7 @@ class Mixer:
         else:
             return 0
 
+    # Retorna nome das aplicacoes emitindo som
     def GetNomeFontes(self):
         NomeFontes = []
         sink_inputs = self.pulse.sink_input_list()
@@ -86,6 +87,7 @@ class Mixer:
                 return True
 
     def OperaComandos(self, SinaisInterpretados):
+        
         for [cabecalho, fontes, volume_percent] in SinaisInterpretados:
             if cabecalho == self.Cabecalhos["Fonte"]:
                 for fonte in fontes:
@@ -93,3 +95,6 @@ class Mixer:
 
             elif cabecalho == self.Cabecalhos["Geral"]:
                 self.MudaVolumeGeral(volume_percent)
+            else:
+                print("COMANDO DESCONHECIDO")
+            
